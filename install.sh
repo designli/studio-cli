@@ -83,8 +83,10 @@ async function signIn(){
     await new Promise(resolve=>setTimeout(resolve,4000));
     const result=await request('/auth/device/token',{body:{deviceCode:device.deviceCode},token:undefined});
     if(result.pending)continue;
-    if(result.user?.role==='client'||typeof result.token!=='string'||!result.workspaceId)throw Error('Sign in with an employee account to install Studio.');
-    connection={token:result.token,expires:result.expires,workspaceId:result.workspaceId};freshToken=true;return;
+    if(typeof result.token!=='string'||!result.workspaceId)throw Error('Studio returned an invalid connection.');
+    connection={token:result.token,expires:result.expires,workspaceId:result.workspaceId};freshToken=true;
+    if(!result.user?.role||result.user.role==='client')throw Error('Sign in with an employee account to install Studio.');
+    return;
   }
   throw Error('Sign-in expired. Run the install command again.');
 }
