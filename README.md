@@ -22,7 +22,14 @@ the printed bin directory to your PATH yourself.
 
 Setup creates a separate employee folder and never rebinds the folder where
 you ran it. Existing project bindings and integration credentials are preserved.
-Use each project's connection instructions to connect its own working folder.
+After login, the agent receives a live onboarding plan and handles project
+selection/creation, folder connection, host configuration, schedules and checks.
+Use `studio onboard --json` to continue or resume. The agent asks only for missing
+business decisions, permissions or private sign-in details; it prepares commands
+and inputs itself. Required real-world verification stays pending until it happens.
+An existing employee login connects assigned project folders without another
+browser sign-in. Manage your connections from the account header in Studio;
+administrators can manage every employee's connections from People.
 Rerunning setup reuses a valid employee login. Run `studio update` from a
 connected folder for later updates.
 

@@ -46,7 +46,7 @@ import {createHash} from 'node:crypto';
 import {gunzipSync} from 'node:zlib';
 import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,renameSync,rmSync,lstatSync,chmodSync} from 'node:fs';
 import {dirname,join} from 'node:path';
-import {homedir,tmpdir} from 'node:os';
+import {homedir,tmpdir,hostname} from 'node:os';
 import {spawn,spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 
@@ -72,7 +72,7 @@ async function request(path,{body,token=connection?.token,binary=false}={}){
 async function signIn(){
   if(connection?.token){try{const status=await request('/auth/status');if(status.user&&status.user.role!=='client'){console.log('Using your existing Studio sign-in.');return;}}catch(error){if(error.status!==401)throw error;}}
   connection=undefined;
-  const device=await request('/auth/device',{body:{}});
+  const device=await request('/auth/device',{body:{connection:{name:hostname(),machine:hostname(),agent:'Studio installer'}}});
   const verify=new URL(device.verificationUrl);
   if(verify.origin!==origin||!['/','/team/workspace/setup'].includes(verify.pathname)||!/^[A-F0-9]{8}$/.test(device.userCode)||typeof device.deviceCode!=='string'||device.deviceCode.length<20||!Number.isFinite(device.expiresIn)||device.expiresIn<=0||device.expiresIn>900)throw Error('Studio returned an invalid sign-in request.');
   console.log('\nOpen '+verify.href+'\n\nEnter this code from your terminal: '+device.userCode+'\nApprove the connection with your employee account.\n');
@@ -128,7 +128,14 @@ try{
   const shell=(process.env.SHELL||'').split('/').pop();
   const profile=shell==='zsh'?join(process.env.ZDOTDIR||homedir(),'.zshrc'):shell==='bash'?(process.platform==='darwin'?join(homedir(),'.bash_profile'):join(homedir(),'.bashrc')):null;
   if(profile){try{let text='';try{text=readFileSync(profile,'utf8');}catch(error){if(error.code!=='ENOENT')throw error;}if(!text.includes(pathLine)){writeFileSync(profile,text+'\n# Designli Studio CLI\n'+pathLine+'\n',{mode:0o600});}}catch{console.log('Add the PATH instruction below to your shell profile to make it permanent.');}}
-  console.log('\nStudio installed. Run this once in your current terminal:\n\n  '+pathLine+'\n\nYour employee connection is ready:\n\n  cd '+quote(employee)+' && studio whoami\n\nFor a client project, use its own folder and the connection instructions in Studio.');
+  console.log('\nStudio installed. Sign-in complete.\n');
+  const onboarding=join(dirname(installed.entry),'onboarding.mjs');
+  if(exists(onboarding)){
+    const {writeAgentSetup}=await import(pathToFileURL(onboarding).href);writeAgentSetup(employee,quote(installed.launcher));
+    const guide=spawnSync(process.execPath,[installed.entry,'onboard','--url',origin],{cwd:employee,env:process.env,encoding:'utf8',maxBuffer:2*1024*1024});
+    if(guide.status===0)console.log(guide.stdout);else console.log('Your agent should continue with '+quote(installed.launcher)+' onboard --url '+quote(origin)+'. '+clean(guide.stderr));
+  }else console.log('The server needs its agent-onboarding update. After it is deployed, rerun this installer.');
+  console.log('\nAGENT: Continue the Studio setup above for this employee. Use '+quote(installed.launcher)+' directly; ask only for missing decisions or sign-in approvals.\n\nOptional for the current shell: '+pathLine);
 }catch(error){
   if(freshToken){try{await request('/auth/logout',{body:{}});}catch{}}
   console.error('\nStudio setup stopped: '+clean(error.message));process.exitCode=1;
